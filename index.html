@@ -1,0 +1,1844 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>丝绸之路轨迹数据生成器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --parchment: #f4e9d0;
+    --parchment-light: #faf3e0;
+    --parchment-dark: #e8d8b0;
+    --ink: #2c1810;
+    --ink-light: #5a3e2b;
+    --gold: #c9a227;
+    --gold-dark: #a17f1a;
+    --accent-red: #8b2500;
+    --accent-blue: #1e4a6e;
+    --border: #8b6914;
+    --shadow: rgba(44, 24, 16, 0.25);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Serif SC', serif;
+    background: var(--parchment);
+    color: var(--ink);
+    min-height: 100vh;
+    background-image:
+      radial-gradient(ellipse at 20% 30%, rgba(201, 162, 39, 0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 70%, rgba(139, 37, 0, 0.05) 0%, transparent 50%),
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23noise)' opacity='0.06'/%3E%3C/svg%3E");
+  }
+
+  .page-wrapper {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 32px 24px;
+  }
+
+  /* ─── Header ─── */
+  header {
+    text-align: center;
+    padding: 32px 0 48px;
+    position: relative;
+  }
+
+  header::before,
+  header::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--gold), var(--gold-dark), var(--gold), transparent);
+  }
+  header::before { top: 0; width: 80%; }
+  header::after { bottom: 16px; width: 60%; }
+
+  .ornament {
+    font-family: 'Cinzel', serif;
+    color: var(--gold-dark);
+    font-size: 14px;
+    letter-spacing: 0.3em;
+    margin-bottom: 8px;
+    opacity: 0.85;
+  }
+
+  h1 {
+    font-family: 'Cinzel', 'Noto Serif SC', serif;
+    font-size: clamp(28px, 4vw, 48px);
+    font-weight: 900;
+    color: var(--ink);
+    letter-spacing: 0.08em;
+    text-shadow: 1px 1px 0 rgba(201, 162, 39, 0.3);
+    margin-bottom: 4px;
+  }
+
+  .subtitle {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 15px;
+    color: var(--ink-light);
+    letter-spacing: 0.12em;
+    font-weight: 400;
+  }
+
+  /* ─── Layout ─── */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  @media (min-width: 1100px) {
+    .main-grid {
+      grid-template-columns: 420px 1fr;
+      align-items: start;
+    }
+  }
+
+  .panel {
+    background: var(--parchment-light);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    position: relative;
+    box-shadow:
+      0 2px 12px var(--shadow),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    overflow: hidden;
+  }
+
+  .panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(135deg, rgba(201, 162, 39, 0.06) 0%, transparent 40%),
+      linear-gradient(315deg, rgba(139, 37, 0, 0.04) 0%, transparent 40%);
+  }
+
+  .panel-header {
+    padding: 16px 24px;
+    background: linear-gradient(180deg, rgba(201, 162, 39, 0.12), rgba(201, 162, 39, 0.04));
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+  }
+
+  .panel-header .icon {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+  }
+
+  .panel-header h2 {
+    font-family: 'Cinzel', 'Noto Serif SC', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.06em;
+  }
+
+  .panel-header .tag {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 2px 8px;
+    border: 1px solid var(--gold-dark);
+    color: var(--gold-dark);
+    border-radius: 2px;
+    background: rgba(201, 162, 39, 0.08);
+  }
+
+  .panel-body {
+    padding: 24px;
+    position: relative;
+  }
+
+  /* ─── Form Elements ─── */
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-group:last-child { margin-bottom: 0; }
+
+  label {
+    display: block;
+    font-family: 'Noto Serif SC', serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-light);
+    margin-bottom: 8px;
+    letter-spacing: 0.04em;
+  }
+
+  label .hint {
+    font-weight: 400;
+    font-size: 11px;
+    color: var(--gold-dark);
+    margin-left: 6px;
+  }
+
+  .input-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  input[type="number"],
+  input[type="text"],
+  textarea {
+    width: 100%;
+    padding: 10px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--ink);
+    background: var(--parchment);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    outline: none;
+    transition: all 0.2s ease;
+    box-shadow: inset 0 1px 3px rgba(44, 24, 16, 0.08);
+  }
+
+  input[type="number"]:focus,
+  input[type="text"]:focus,
+  textarea:focus {
+    border-color: var(--gold-dark);
+    box-shadow:
+      inset 0 1px 3px rgba(44, 24, 16, 0.08),
+      0 0 0 3px rgba(201, 162, 39, 0.15);
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    background: linear-gradient(90deg, var(--parchment-dark), var(--gold), var(--gold-dark));
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: linear-gradient(135deg, var(--gold), var(--gold-dark));
+    border: 2px solid var(--parchment-light);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(44, 24, 16, 0.3);
+    transition: transform 0.15s;
+  }
+
+  input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+  }
+
+  input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: linear-gradient(135deg, var(--gold), var(--gold-dark));
+    border: 2px solid var(--parchment-light);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(44, 24, 16, 0.3);
+  }
+
+  textarea {
+    resize: vertical;
+    min-height: 200px;
+    line-height: 1.6;
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 12px 20px;
+    font-family: 'Cinzel', 'Noto Serif SC', serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-primary {
+    background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+    color: var(--ink);
+    border-color: var(--gold-dark);
+    box-shadow:
+      0 2px 6px rgba(201, 162, 39, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow:
+      0 4px 12px rgba(201, 162, 39, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .btn-secondary {
+    background: var(--parchment);
+    color: var(--ink-light);
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--parchment-dark);
+  }
+
+  /* ─── Control Points List ─── */
+  .points-editor {
+    max-height: 280px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--parchment);
+  }
+
+  .points-editor::-webkit-scrollbar { width: 10px; }
+  .points-editor::-webkit-scrollbar-track { background: var(--parchment-dark); }
+  .points-editor::-webkit-scrollbar-thumb { background: var(--gold-dark); border-radius: 3px; }
+
+  .point-row {
+    display: grid;
+    grid-template-columns: 36px 1fr 1fr 36px;
+    gap: 8px;
+    padding: 8px 10px;
+    border-bottom: 1px dashed rgba(139, 105, 20, 0.3);
+    align-items: center;
+  }
+
+  .point-row:last-child { border-bottom: none; }
+
+  .point-row:not(.point-header):nth-child(even) { background: rgba(201, 162, 39, 0.04); }
+
+  /* 表头行不应用交替色 */
+  .point-header {
+    background: rgba(201, 162, 39, 0.12) !important;
+    border-bottom: 1px solid rgba(139, 105, 20, 0.5) !important;
+    padding: 6px 10px;
+  }
+
+  .point-col-label {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ink-light);
+    text-align: center;
+    letter-spacing: 0.08em;
+  }
+
+  .point-idx {
+    font-family: 'Cinzel', serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--gold-dark);
+    text-align: center;
+  }
+
+  .point-input {
+    padding: 6px 8px !important;
+    font-size: 12px !important;
+  }
+
+  .icon-btn {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--accent-red);
+    background: transparent;
+    color: var(--accent-red);
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+
+  .icon-btn:hover {
+    background: var(--accent-red);
+    color: var(--parchment-light);
+  }
+
+  .add-point-row {
+    padding: 10px;
+    text-align: center;
+  }
+
+  .add-btn {
+    padding: 6px 16px;
+    font-family: 'Noto Serif SC', serif;
+    font-size: 12px;
+    border: 1px dashed var(--gold-dark);
+    background: transparent;
+    color: var(--gold-dark);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .add-btn:hover {
+    background: rgba(201, 162, 39, 0.1);
+    border-style: solid;
+  }
+
+  /* ─── Log Console ─── */
+  .console {
+    background: #1a1008;
+    color: #e8d8b0;
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 14px 16px;
+    border: 1px solid #3a2818;
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5);
+  }
+
+  .console::-webkit-scrollbar { width: 8px; }
+  .console::-webkit-scrollbar-track { background: #0e0804; }
+  .console::-webkit-scrollbar-thumb { background: var(--gold-dark); border-radius: 4px; }
+
+  .log-line { white-space: pre-wrap; word-break: break-all; }
+  .log-info { color: #e8d8b0; }
+  .log-step { color: #f0c040; font-weight: 500; }
+  .log-success { color: #6db86d; }
+  .log-warn { color: #e08a3c; }
+  .log-error { color: #d95050; }
+  .log-data { color: #8ac6e0; }
+
+  .log-line::before {
+    content: '›';
+    color: var(--gold-dark);
+    margin-right: 8px;
+    opacity: 0.6;
+  }
+
+  .progress-wrap {
+    margin-bottom: 16px;
+  }
+
+  .progress-bar {
+    height: 8px;
+    background: rgba(139, 105, 20, 0.2);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--gold), var(--gold-dark));
+    border-radius: 4px;
+    width: 0%;
+    transition: width 0.3s ease;
+    box-shadow: 0 0 8px rgba(201, 162, 39, 0.5);
+  }
+
+  .progress-text {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-light);
+  }
+
+  /* ─── Output Area ─── */
+  .output-section { margin-bottom: 28px; }
+  .output-section:last-child { margin-bottom: 0; }
+
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(139, 105, 20, 0.3);
+  }
+
+  .section-title .bullet {
+    width: 10px;
+    height: 10px;
+    background: var(--gold);
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(201, 162, 39, 0.6);
+  }
+
+  .section-title h3 {
+    font-family: 'Cinzel', 'Noto Serif SC', serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.05em;
+  }
+
+  .section-title .meta {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--gold-dark);
+  }
+
+  /* ─── Map Visualization ─── */
+  .map-container {
+    background: var(--parchment);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 12px;
+    position: relative;
+  }
+
+  .map-svg-wrap {
+    width: 100%;
+    overflow: auto;
+    background:
+      radial-gradient(ellipse at center, rgba(201, 162, 39, 0.04) 0%, transparent 70%);
+  }
+
+  svg.trajectory-map {
+    display: block;
+    margin: 0 auto;
+  }
+
+  .map-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed rgba(139, 105, 20, 0.3);
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--ink-light);
+  }
+
+  .legend-swatch {
+    width: 20px;
+    height: 4px;
+    border-radius: 2px;
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  /* ─── Data Table ─── */
+  .table-wrap {
+    max-height: 360px;
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--parchment);
+  }
+
+  .table-wrap::-webkit-scrollbar { width: 10px; height: 10px; }
+  .table-wrap::-webkit-scrollbar-track { background: var(--parchment-dark); }
+  .table-wrap::-webkit-scrollbar-thumb { background: var(--gold-dark); border-radius: 3px; }
+
+  table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+
+  table.data-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+
+  table.data-table th {
+    padding: 10px 16px;
+    text-align: right;
+    background: linear-gradient(180deg, rgba(201, 162, 39, 0.2), rgba(201, 162, 39, 0.1));
+    color: var(--ink);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    border-bottom: 2px solid var(--border);
+  }
+
+  table.data-table th:first-child { text-align: center; }
+
+  table.data-table td {
+    padding: 7px 16px;
+    text-align: right;
+    border-bottom: 1px solid rgba(139, 105, 20, 0.15);
+    color: var(--ink-light);
+  }
+
+  table.data-table td:first-child {
+    text-align: center;
+    color: var(--gold-dark);
+    font-weight: 600;
+  }
+
+  table.data-table tbody tr:hover {
+    background: rgba(201, 162, 39, 0.08);
+  }
+
+  table.data-table tbody tr:nth-child(even) {
+    background: rgba(201, 162, 39, 0.025);
+  }
+  table.data-table tbody tr:nth-child(even):hover {
+    background: rgba(201, 162, 39, 0.08);
+  }
+
+  /* ─── Stats Cards ─── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .stat-card {
+    padding: 14px 16px;
+    background: var(--parchment);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px; height: 100%;
+    background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  }
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--ink-light);
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+  }
+
+  .stat-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  /* ─── Empty State ─── */
+  .empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--ink-light);
+  }
+
+  .empty-state .compass {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 16px;
+    opacity: 0.5;
+  }
+
+  .empty-state p {
+    font-size: 14px;
+    line-height: 1.8;
+    opacity: 0.8;
+  }
+
+  .empty-state p strong {
+    color: var(--gold-dark);
+    font-weight: 700;
+  }
+
+  /* ─── Footer ─── */
+  footer {
+    text-align: center;
+    margin-top: 48px;
+    padding: 24px;
+    border-top: 1px solid rgba(139, 105, 20, 0.25);
+    font-size: 12px;
+    color: var(--ink-light);
+    opacity: 0.75;
+    letter-spacing: 0.06em;
+  }
+
+  /* ─── Animations ─── */
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .fade-in {
+    animation: fadeInUp 0.5s ease forwards;
+    opacity: 0;
+  }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(201, 162, 39, 0.4); }
+    50% { box-shadow: 0 0 0 8px rgba(201, 162, 39, 0); }
+  }
+
+  .running .progress-fill {
+    animation: pulse 1.5s infinite;
+  }
+</style>
+</head>
+<body>
+<div class="page-wrapper">
+
+  <header>
+    <div class="ornament">◆  ANTIQUA  ITERA  ◆</div>
+    <h1>丝绸之路轨迹数据生成器</h1>
+    <p class="subtitle">— SILK ROAD TRAJECTORY GENERATOR —</p>
+    <p class="subtitle" style="margin-top:6px; font-size:13px;">三次样条插值 · 自然边界条件 · 等弧长采样 · 2000点输出</p>
+  </header>
+
+  <div class="main-grid">
+
+    <!-- ── Left Column: Input + Console ── -->
+    <div style="display:flex; flex-direction:column; gap:28px;">
+
+      <!-- Input Panel -->
+      <div class="panel fade-in" style="animation-delay:.05s;">
+        <div class="panel-header">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--gold-dark);">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+          <h2>参数输入</h2>
+          <span class="tag">STEP 01</span>
+        </div>
+        <div class="panel-body">
+
+          <div class="form-group">
+            <label>地图尺寸 <span class="hint">宽 × 高</span></label>
+            <div class="input-row">
+              <div>
+                <input type="number" id="mapWidth" value="6000" min="100" step="10">
+              </div>
+              <div>
+                <input type="number" id="mapHeight" value="2000" min="100" step="10">
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>控制点 <span class="hint">至少 2 个</span></label>
+            <div class="points-editor" id="pointsEditor"></div>
+          </div>
+
+          <div class="form-group">
+            <label>平滑强度 <span class="hint" id="smoothValLabel">0.00</span></label>
+            <input type="range" id="smoothStrength" value="0" min="0" max="1" step="0.05"
+              oninput="document.getElementById('smoothValLabel').textContent = this.value">
+          </div>
+
+          <div class="form-group">
+            <label>输出点数 <span class="hint">等弧长采样</span></label>
+            <input type="number" id="nOutput" value="2000" min="50" max="5000" step="50">
+          </div>
+
+          <div class="form-group">
+            <label>期望轨迹长度 <span class="hint">留空 = 不缩放</span></label>
+            <input type="number" id="targetLength" value="" min="0" step="100" placeholder="例如 10000">
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-secondary" id="loadDemoBtn">载入示例</button>
+            <button class="btn btn-primary" id="generateBtn">生成轨迹</button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Console Panel -->
+      <div class="panel fade-in" style="animation-delay:.12s;">
+        <div class="panel-header">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--gold-dark);">
+            <polyline points="4 17 10 11 4 5"/>
+            <line x1="12" y1="19" x2="20" y2="19"/>
+          </svg>
+          <h2>运行过程</h2>
+          <span class="tag" id="statusTag">待命</span>
+        </div>
+        <div class="panel-body">
+
+          <div class="progress-wrap">
+            <div class="progress-bar">
+              <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-text">
+              <span id="progressStep">等待开始...</span>
+              <span id="progressPct">0%</span>
+            </div>
+          </div>
+
+          <div class="console" id="console"></div>
+
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── Right Column: Output ── -->
+    <div class="panel fade-in" style="animation-delay:.18s;">
+      <div class="panel-header">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--gold-dark);">
+          <path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/>
+          <polyline points="8 10 16 14"/>
+          <polyline points="16 6 8 10"/>
+        </svg>
+        <h2>结果输出</h2>
+        <span class="tag">STEP 02</span>
+      </div>
+      <div class="panel-body" id="outputArea">
+
+        <div class="empty-state" id="emptyState">
+          <svg class="compass" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="50" cy="50" r="46" stroke="#a17f1a" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <circle cx="50" cy="50" r="36" stroke="#a17f1a" stroke-width="1"/>
+            <polygon points="50,18 56,50 50,82 44,50" fill="#c9a227" opacity="0.7"/>
+            <polygon points="18,50 50,56 82,50 50,44" fill="#8b2500" opacity="0.6"/>
+            <circle cx="50" cy="50" r="5" fill="#a17f1a"/>
+            <text x="50" y="12" text-anchor="middle" font-family="Cinzel, serif" font-size="10" fill="#a17f1a" font-weight="700">N</text>
+            <text x="50" y="96" text-anchor="middle" font-family="Cinzel, serif" font-size="10" fill="#a17f1a" font-weight="700">S</text>
+            <text x="90" y="54" text-anchor="middle" font-family="Cinzel, serif" font-size="10" fill="#a17f1a" font-weight="700">E</text>
+            <text x="10" y="54" text-anchor="middle" font-family="Cinzel, serif" font-size="10" fill="#a17f1a" font-weight="700">W</text>
+          </svg>
+          <p>
+            设置左侧参数后点击 <strong>「生成轨迹」</strong><br>
+            将在此处输出 <strong>SVG 轨迹地图</strong> 与 <strong>2000 行数据表格</strong>
+          </p>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    ◆  SILK ROAD TRAJECTORY ENGINE · CUBIC SPLINE · EQUAL ARC-LENGTH SAMPLING · 2000 PTS  ◆
+  </footer>
+
+</div>
+
+<script>
+/* =========================================================
+   丝绸之路轨迹数据生成器 - 前端核心算法
+   翻译自 generate_trajectory.py (NumPy → 纯 JS)
+   ========================================================= */
+
+// ──────────────────────────────────────────────────────────
+// 0. Demo: 丝绸之路 31 控制点
+// ──────────────────────────────────────────────────────────
+const SILK_ROAD_DEMO = {
+  mapW: 6000,
+  mapH: 2000,
+  points: [
+    [300,460],[580,650],[640,840],[760,950],[870,1040],
+    [1070,1080],[1120,1110],[1140,1390],[1370,1396],[1540,1260],
+    [1710,1260],[1850,1200],[2080,1010],[2310,1110],[2450,1210],
+    [2570,1030],[2710,1040],[2850,810],[2970,670],[3410,610],
+    [3400,300],[3570,520],[3790,360],[4240,660],[4420,1060],
+    [4630,1190],[4750,1180],[4930,1370],[5030,1290],[5700,1700],
+    [5517,1280]
+  ]
+};
+
+// ──────────────────────────────────────────────────────────
+// 1. Logger + Progress
+// ──────────────────────────────────────────────────────────
+const logger = {
+  el: null,
+  init() { this.el = document.getElementById('console'); },
+  clear() { if (this.el) this.el.innerHTML = ''; },
+  _add(type, msg) {
+    if (!this.el) return;
+    const line = document.createElement('div');
+    line.className = `log-line log-${type}`;
+    line.textContent = msg;
+    this.el.appendChild(line);
+    this.el.scrollTop = this.el.scrollHeight;
+  },
+  info(m)    { this._add('info', m); },
+  step(m)    { this._add('step', '▶ ' + m); },
+  success(m) { this._add('success', '✓ ' + m); },
+  warn(m)    { this._add('warn', '! ' + m); },
+  error(m)   { this._add('error', '✗ ' + m); },
+  data(m)    { this._add('data', m); }
+};
+
+const progress = {
+  fill: null, pct: null, step: null, tag: null,
+  init() {
+    this.fill = document.getElementById('progressFill');
+    this.pct = document.getElementById('progressPct');
+    this.step = document.getElementById('progressStep');
+    this.tag = document.getElementById('statusTag');
+  },
+  set(pct, stepText, status) {
+    if (this.fill) this.fill.style.width = pct + '%';
+    if (this.pct) this.pct.textContent = Math.round(pct) + '%';
+    if (this.step) this.step.textContent = stepText || '';
+    if (this.tag) {
+      this.tag.textContent = status || (pct >= 100 ? '完成' : '运行中');
+      this.tag.style.borderColor = status === '错误' ? '#8b2500'
+        : pct >= 100 ? '#4a7c3a' : '#a17f1a';
+      this.tag.style.color = status === '错误' ? '#8b2500'
+        : pct >= 100 ? '#4a7c3a' : '#a17f1a';
+    }
+    document.querySelector('.progress-wrap')?.classList.toggle('running', pct > 0 && pct < 100);
+  }
+};
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ──────────────────────────────────────────────────────────
+// 2. 控制点输入 UI
+// ──────────────────────────────────────────────────────────
+const pointsEditor = {
+  el: null,
+  points: [],
+  init() {
+    this.el = document.getElementById('pointsEditor');
+    this.loadPoints(SILK_ROAD_DEMO.points);
+  },
+  loadPoints(pts) {
+    this.points = pts.map(p => [p[0], p[1]]);
+    this.render();
+  },
+  addPoint(x = 0, y = 0) {
+    this.points.push([x, y]);
+    this.render();
+  },
+  removePoint(idx) {
+    if (this.points.length <= 2) {
+      logger.warn('至少需要 2 个控制点');
+      return;
+    }
+    this.points.splice(idx, 1);
+    this.render();
+  },
+  updatePoint(idx, axis, val) {
+    const num = parseFloat(val);
+    if (!isNaN(num)) this.points[idx][axis] = num;
+  },
+  render() {
+    if (!this.el) return;
+    // 表头行
+    let html = `<div class="point-row point-header">
+      <div class="point-idx" style="font-weight:400;">#</div>
+      <div class="point-col-label">X</div>
+      <div class="point-col-label">Y</div>
+      <div></div>
+    </div>`;
+    this.points.forEach((p, i) => {
+      html += `
+        <div class="point-row">
+          <div class="point-idx">${String(i + 1).padStart(2, '0')}</div>
+          <input type="number" class="point-input" value="${p[0]}" step="10"
+            onchange="pointsEditor.updatePoint(${i},0,this.value)">
+          <input type="number" class="point-input" value="${p[1]}" step="10"
+            onchange="pointsEditor.updatePoint(${i},1,this.value)">
+          <button class="icon-btn" title="删除" onclick="pointsEditor.removePoint(${i})">×</button>
+        </div>`;
+    });
+    html += `<div class="add-point-row">
+      <button class="add-btn" onclick="pointsEditor.addPoint()">+ 添加控制点</button>
+    </div>`;
+    this.el.innerHTML = html;
+  },
+  getPoints() {
+    return this.points
+      .filter(p => !isNaN(p[0]) && !isNaN(p[1]))
+      .map(p => [Number(p[0]), Number(p[1])]);
+  }
+};
+
+// ──────────────────────────────────────────────────────────
+// 3. 核心算法
+// ──────────────────────────────────────────────────────────
+
+// 3.0 控制点平滑预处理
+function smoothControlPoints(pts, strength = 0) {
+  if (strength <= 0 || pts.length <= 2) return pts.map(p => [p[0], p[1]]);
+  const n = pts.length;
+  const result = pts.map(p => [p[0], p[1]]);
+  for (let i = 1; i < n - 1; i++) {
+    const mx = (result[i - 1][0] + result[i + 1][0]) / 2;
+    const my = (result[i - 1][1] + result[i + 1][1]) / 2;
+    result[i][0] = result[i][0] + strength * (mx - result[i][0]);
+    result[i][1] = result[i][1] + strength * (my - result[i][1]);
+  }
+  return result;
+}
+
+// 2.2 输出轨迹平滑（后处理，控制点位置不变）
+function smoothOutputTrajectory(xs, ys, ctrlPts, strength, nIter = 5) {
+  // 对等弧长输出轨迹做 Laplacian 平滑，控制点作为固定约束
+  if (strength <= 0 || ctrlPts.length <= 2) return { x: xs.slice(), y: ys.slice() };
+
+  const n = xs.length;
+
+  // 找到每个控制点最近的输出点索引
+  const fixed = new Map(); // idx -> {x, y}
+  for (const cp of ctrlPts) {
+    let bestIdx = 0, bestDist2 = Infinity;
+    for (let i = 0; i < n; i++) {
+      const d2 = (xs[i] - cp[0]) ** 2 + (ys[i] - cp[1]) ** 2;
+      if (d2 < bestDist2) { bestDist2 = d2; bestIdx = i; }
+    }
+    fixed.set(bestIdx, { x: cp[0], y: cp[1] });
+  }
+
+  let xr = new Float64Array(xs);
+  let yr = new Float64Array(ys);
+
+  for (let iter = 0; iter < nIter; iter++) {
+    const xn = new Float64Array(xr);
+    const yn = new Float64Array(yr);
+
+    for (let i = 1; i < n - 1; i++) {
+      if (fixed.has(i)) continue;
+      xn[i] = xr[i] + strength * ((xr[i - 1] + xr[i + 1]) * 0.5 - xr[i]);
+      yn[i] = yr[i] + strength * ((yr[i - 1] + yr[i + 1]) * 0.5 - yr[i]);
+    }
+
+    // 强制控制点位置精确还原
+    for (const [idx, cp] of fixed) {
+      xn[idx] = cp.x;
+      yn[idx] = cp.y;
+    }
+
+    xr = xn;
+    yr = yn;
+  }
+
+  // 重新等弧长分配
+  const arc = new Float64Array(n);
+  for (let i = 1; i < n; i++) {
+    const dx = xr[i] - xr[i - 1];
+    const dy = yr[i] - yr[i - 1];
+    arc[i] = arc[i - 1] + Math.sqrt(dx * dx + dy * dy);
+  }
+  const total = arc[n - 1];
+
+  const xEq = new Array(n);
+  const yEq = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const tgt = (total * i) / (n - 1);
+    // 线性插值
+    let lo = 0, hi = n - 1;
+    while (lo < hi - 1) {
+      const mid = (lo + hi) >> 1;
+      if (arc[mid] < tgt) lo = mid; else hi = mid;
+    }
+    const segLen = arc[hi] - arc[lo];
+    const frac = segLen > 1e-15 ? (tgt - arc[lo]) / segLen : 0;
+    xEq[i] = xr[lo] + frac * (xr[hi] - xr[lo]);
+    yEq[i] = yr[lo] + frac * (yr[hi] - yr[lo]);
+  }
+
+  // 重新等弧长后控制点可能有微小偏移，再次修正
+  for (const cp of ctrlPts) {
+    let bestIdx = 0, bestDist2 = Infinity;
+    for (let i = 0; i < n; i++) {
+      const d2 = (xEq[i] - cp[0]) ** 2 + (yEq[i] - cp[1]) ** 2;
+      if (d2 < bestDist2) { bestDist2 = d2; bestIdx = i; }
+    }
+    xEq[bestIdx] = cp[0];
+    yEq[bestIdx] = cp[1];
+  }
+
+  return { x: xEq, y: yEq };
+}
+
+// 3.1 Thomas 三对角求解
+function tridiagonalSolve(sub, diag, sup, rhs) {
+  const n = diag.length;
+  const d = diag.slice();
+  const r = rhs.slice();
+  for (let i = 1; i < n; i++) {
+    const w = sub[i - 1] / d[i - 1];
+    d[i] -= w * sup[i - 1];
+    r[i] -= w * r[i - 1];
+  }
+  const x = new Array(n);
+  x[n - 1] = r[n - 1] / d[n - 1];
+  for (let i = n - 2; i >= 0; i--) {
+    x[i] = (r[i] - sup[i] * x[i + 1]) / d[i];
+  }
+  return x;
+}
+
+// 3.2 自然三次样条拟合
+function fitNaturalCubicSpline(tKnots, y) {
+  const nSeg = tKnots.length - 1;
+  const h = [];
+  for (let i = 0; i < nSeg; i++) h.push(tKnots[i + 1] - tKnots[i]);
+
+  if (nSeg === 1) {
+    return {
+      a: [y[0]],
+      b: [(y[1] - y[0]) / h[0]],
+      c: [0],
+      d: [0]
+    };
+  }
+
+  const nEq = nSeg - 1;
+  const diag = new Array(nEq).fill(2);
+  const subDiag = new Array(nEq - 1).fill(0);
+  const supDiag = new Array(nEq - 1).fill(0);
+  const rhs = new Array(nEq).fill(0);
+
+  for (let i = 1; i < nSeg; i++) {
+    const row = i - 1;
+    const hL = h[i - 1], hR = h[i];
+    const denom = hL + hR;
+    if (row > 0) subDiag[row - 1] = hL / denom;
+    if (row < nEq - 1) supDiag[row] = hR / denom;
+    rhs[row] = (6 / denom) * ((y[i + 1] - y[i]) / hR - (y[i] - y[i - 1]) / hL);
+  }
+
+  const MInner = tridiagonalSolve(subDiag, diag, supDiag, rhs);
+  const M = new Array(nSeg + 1).fill(0);
+  for (let i = 0; i < nEq; i++) M[i + 1] = MInner[i];
+
+  const a = [], b = [], c = [], d = [];
+  for (let i = 0; i < nSeg; i++) {
+    const hi = h[i];
+    a.push(y[i]);
+    b.push((y[i + 1] - y[i]) / hi - hi * (2 * M[i] + M[i + 1]) / 6);
+    c.push(M[i] / 2);
+    d.push((M[i + 1] - M[i]) / (6 * hi));
+  }
+  return { a, b, c, d };
+}
+
+// 3.3 样条求值
+function evalSpline(tVals, tKnots, coeff, deriv = 0) {
+  const { a, b, c, d } = coeff;
+  const tArr = Array.isArray(tVals) ? tVals : [tVals];
+  const nSeg = a.length;
+  const result = new Array(tArr.length).fill(0);
+
+  for (let seg = 0; seg < nSeg; seg++) {
+    const lo = tKnots[seg], hi = tKnots[seg + 1];
+    for (let i = 0; i < tArr.length; i++) {
+      const t = tArr[i];
+      const inSeg = (t >= lo && t < hi) || (seg === nSeg - 1 && Math.abs(t - hi) < 1e-10);
+      if (!inSeg) continue;
+      const dt = t - lo;
+      if (deriv === 0)
+        result[i] = a[seg] + b[seg] * dt + c[seg] * dt * dt + d[seg] * dt * dt * dt;
+      else if (deriv === 1)
+        result[i] = b[seg] + 2 * c[seg] * dt + 3 * d[seg] * dt * dt;
+      else if (deriv === 2)
+        result[i] = 2 * c[seg] + 6 * d[seg] * dt;
+    }
+  }
+  return Array.isArray(tVals) ? result : result[0];
+}
+
+// 3.4 linspace
+function linspace(a, b, n) {
+  const res = new Array(n);
+  if (n === 1) { res[0] = a; return res; }
+  const step = (b - a) / (n - 1);
+  for (let i = 0; i < n; i++) res[i] = a + i * step;
+  return res;
+}
+
+// 3.5 np.interp 一维线性插值
+function interp(xNew, xOld, yOld) {
+  const n = xNew.length;
+  const out = new Array(n);
+  let j = 0;
+  for (let i = 0; i < n; i++) {
+    const x = xNew[i];
+    while (j < xOld.length - 2 && x > xOld[j + 1]) j++;
+    const x0 = xOld[j], x1 = xOld[j + 1];
+    const y0 = yOld[j], y1 = yOld[j + 1];
+    if (x1 === x0) { out[i] = y0; continue; }
+    const t = (x - x0) / (x1 - x0);
+    out[i] = y0 + t * (y1 - y0);
+  }
+  return out;
+}
+
+// 3.6 轻量弧长计算（二分搜索用，不需等弧长插值）
+function computeTotalArcLength(tKnots, cX, cY, nDense = 20000) {
+  const tDense = linspace(tKnots[0], tKnots[tKnots.length - 1], nDense);
+  const xD = evalSpline(tDense, tKnots, cX, 0);
+  const yD = evalSpline(tDense, tKnots, cY, 0);
+  let total = 0;
+  for (let i = 1; i < nDense; i++) {
+    const dx = xD[i] - xD[i - 1];
+    const dy = yD[i] - yD[i - 1];
+    total += Math.sqrt(dx * dx + dy * dy);
+  }
+  return total;
+}
+
+// 3.7 样条系数混合：在自然样条与折线之间调节弧长
+function blendSplineCoeffs(tKnots, coeff, yCtrl, alpha) {
+  // coeff = {a, b, c, d} 来自 fitNaturalCubicSpline
+  // 折线: a = y_i, b_poly = (y_{i+1} - y_i)/h_i, c = 0, d = 0
+  // 混合: a_blend = a (不变), b_blend = b + α*(b_poly - b),
+  //        c_blend = (1-α)*c, d_blend = (1-α)*d
+  const nSeg = coeff.a.length;
+  const aB = coeff.a.slice();  // 不变
+  const bB = new Array(nSeg);
+  const cB = new Array(nSeg);
+  const dB = new Array(nSeg);
+  const h = [];
+  for (let i = 0; i < nSeg; i++) h.push(tKnots[i + 1] - tKnots[i]);
+
+  for (let i = 0; i < nSeg; i++) {
+    const hi = h[i];
+    const bPoly = hi > 1e-15 ? (yCtrl[i + 1] - yCtrl[i]) / hi : 0;
+    bB[i] = coeff.b[i] + alpha * (bPoly - coeff.b[i]);
+    cB[i] = (1 - alpha) * coeff.c[i];
+    dB[i] = (1 - alpha) * coeff.d[i];
+  }
+  return { a: aB, b: bB, c: cB, d: dB };
+}
+
+// 3.8 二分搜索 α 使混合样条弧长 ≈ target
+function findAlphaForTargetLength(tKnots, cXorig, cYorig,
+                                  xCtrl, yCtrl, targetLen, chordSum,
+                                  nDense = 20000) {
+  // 无法达到的目标
+  if (targetLen <= chordSum + 1e-6) {
+    return { alpha: 1.0, length: chordSum, success: false,
+             msg: `⚠ 目标长度 (${targetLen.toFixed(2)}) ≤ 弦长总和 (${chordSum.toFixed(2)})，使用折线。` };
+  }
+
+  const maxIter = 60;
+  const tolRel = 2e-4, tolAbs = 0.5;
+  let lo = -2.0, hi = 1.0;
+
+  function arcLenForAlpha(a) {
+    const cX = blendSplineCoeffs(tKnots, cXorig, xCtrl, a);
+    const cY = blendSplineCoeffs(tKnots, cYorig, yCtrl, a);
+    return computeTotalArcLength(tKnots, cX, cY, nDense);
+  }
+
+  // α_hi 处（折线附近）应 < target
+  const L_hi = arcLenForAlpha(hi);
+  if (L_hi > targetLen) {
+    return { alpha: 1.0, length: chordSum, success: false,
+             msg: `⚠ 折线弧长 (${chordSum.toFixed(2)}) 为最短路径，无法达到 ${targetLen.toFixed(2)}。使用折线。` };
+  }
+
+  // α_lo 处应 > target，否则扩展下界
+  let L_lo = arcLenForAlpha(lo);
+  let expand = 0;
+  while (L_lo < targetLen && expand < 8) {
+    lo -= 2.0;
+    L_lo = arcLenForAlpha(lo);
+    expand++;
+  }
+  if (L_lo < targetLen) {
+    return { alpha: lo, length: L_lo, success: false,
+             msg: `⚠ α=${lo.toFixed(1)} 处弧长 (${L_lo.toFixed(2)}) 仍小于目标 ${targetLen.toFixed(2)}。` };
+  }
+
+  // 二分搜索
+  for (let iter = 0; iter < maxIter; iter++) {
+    const mid = (lo + hi) / 2;
+    const L_mid = arcLenForAlpha(mid);
+    const err = Math.abs(L_mid - targetLen);
+    const tol = Math.max(tolRel * targetLen, tolAbs);
+    if (err <= tol && iter >= 3) {
+      return { alpha: mid, length: L_mid, success: true, msg: '' };
+    }
+    if (L_mid < targetLen) {
+      hi = mid;
+    } else {
+      lo = mid;
+    }
+  }
+
+  const alphaFinal = (lo + hi) / 2;
+  const L_final = arcLenForAlpha(alphaFinal);
+  const errFinal = Math.abs(L_final - targetLen);
+  if (errFinal <= Math.max(tolRel * targetLen, tolAbs)) {
+    return { alpha: alphaFinal, length: L_final, success: true, msg: '' };
+  }
+  return { alpha: alphaFinal, length: L_final, success: false,
+           msg: `⚠ 二分搜索达最大迭代次数，当前误差: ${errFinal.toFixed(2)}` };
+}
+
+// 3.9 等弧长重采样
+function arcLengthReparam(tKnots, cX, cY, nOutput = 2000, nDense = 20000) {
+  const tDense = linspace(tKnots[0], tKnots[tKnots.length - 1], nDense);
+  const xD = evalSpline(tDense, tKnots, cX, 0);
+  const yD = evalSpline(tDense, tKnots, cY, 0);
+  const xpD = evalSpline(tDense, tKnots, cX, 1);
+  const ypD = evalSpline(tDense, tKnots, cY, 1);
+  const xppD = evalSpline(tDense, tKnots, cX, 2);
+  const yppD = evalSpline(tDense, tKnots, cY, 2);
+
+  const arcDense = new Array(nDense).fill(0);
+  for (let i = 1; i < nDense; i++) {
+    const dx = xD[i] - xD[i - 1];
+    const dy = yD[i] - yD[i - 1];
+    arcDense[i] = arcDense[i - 1] + Math.sqrt(dx * dx + dy * dy);
+  }
+  const totalLen = arcDense[nDense - 1];
+  const targetArc = linspace(0, totalLen, nOutput);
+
+  return {
+    x: interp(targetArc, arcDense, xD),
+    y: interp(targetArc, arcDense, yD),
+    xp: interp(targetArc, arcDense, xpD),
+    yp: interp(targetArc, arcDense, ypD),
+    xpp: interp(targetArc, arcDense, xppD),
+    ypp: interp(targetArc, arcDense, yppD),
+    totalLen
+  };
+}
+
+// 3.7 有符号曲率半径
+function findNearestSign(kappa, idx) {
+  const n = kappa.length;
+  for (let d = 1; d < n; d++) {
+    const fwd = idx + d;
+    if (fwd < n && Math.abs(kappa[fwd]) >= 1e-8)
+      return kappa[fwd] > 0 ? 1 : -1;
+    const bwd = idx - d;
+    if (bwd >= 0 && Math.abs(kappa[bwd]) >= 1e-8)
+      return kappa[bwd] > 0 ? 1 : -1;
+  }
+  return 1;
+}
+
+function computeSignedRadius(xp, yp, xpp, ypp) {
+  const n = xp.length;
+  const R = new Array(n);
+  const kappa = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const num = xp[i] * ypp[i] - yp[i] * xpp[i];
+    const den = Math.pow(xp[i] * xp[i] + yp[i] * yp[i], 1.5);
+    if (Math.abs(den) < 1e-15) kappa[i] = 0;
+    else kappa[i] = num / den;
+    if (Math.abs(kappa[i]) < 1e-8) {
+      const s = findNearestSign(kappa, i);
+      R[i] = s * 99999.99;
+    } else {
+      R[i] = 1 / kappa[i];
+    }
+  }
+  return R;
+}
+
+// ──────────────────────────────────────────────────────────
+// 4. 主流程
+// ──────────────────────────────────────────────────────────
+async function generateTrajectory() {
+  const btn = document.getElementById('generateBtn');
+  btn.disabled = true;
+  logger.clear();
+  progress.set(0, '初始化...', '运行中');
+  await sleep(200);
+
+  try {
+    // Step 1: 读取输入
+    logger.step('步骤 1 / 8：读取输入参数');
+    const mapW = parseFloat(document.getElementById('mapWidth').value);
+    const mapH = parseFloat(document.getElementById('mapHeight').value);
+    const smoothStrength = parseFloat(document.getElementById('smoothStrength').value) || 0;
+    const N_OUT = parseInt(document.getElementById('nOutput').value) || 2000;
+    const targetLen = parseFloat(document.getElementById('targetLength').value) || 0;
+    const rawPts = pointsEditor.getPoints();
+    await sleep(150);
+
+    if (isNaN(mapW) || isNaN(mapH) || mapW <= 0 || mapH <= 0)
+      throw new Error('地图尺寸无效');
+    if (rawPts.length < 2)
+      throw new Error('至少需要 2 个控制点');
+
+    logger.info(`地图尺寸: ${mapW} × ${mapH}`);
+    logger.info(`控制点数量: ${rawPts.length}`);
+    if (smoothStrength > 0) logger.info(`平滑强度: ${smoothStrength.toFixed(2)}（后处理模式：轨迹始终经过所有控制点）`);
+    logger.info(`输出点数: ${N_OUT}`);
+    if (rawPts.length >= 5) {
+      const sample = rawPts.slice(0, 3).map(p => `(${p[0].toFixed(0)}, ${p[1].toFixed(0)})`).join(', ');
+      logger.data(`前 3 点: ${sample}, ...`);
+    }
+    progress.set(15, '累积弦长参数化...');
+    await sleep(200);
+
+    // Step 2: 累积弦长参数化（始终使用原始控制点）
+    logger.step('步骤 2 / 8：累积弦长参数化');
+    const nPts = rawPts.length;
+    const tKnots = new Array(nPts).fill(0);
+    for (let i = 1; i < nPts; i++) {
+      const dx = rawPts[i][0] - rawPts[i - 1][0];
+      const dy = rawPts[i][1] - rawPts[i - 1][1];
+      tKnots[i] = tKnots[i - 1] + Math.sqrt(dx * dx + dy * dy);
+    }
+    if (tKnots[nPts - 1] < 1e-12)
+      throw new Error('控制点不能全部相同');
+    const chordSum = tKnots[nPts - 1];
+    logger.data(`累积弦长范围: [0, ${chordSum.toFixed(2)}]`);
+    const xCtrl = rawPts.map(p => p[0]);
+    const yCtrl = rawPts.map(p => p[1]);
+    progress.set(28, '拟合自然三次样条...');
+    await sleep(300);
+
+    // Step 3: 拟合自然边界三次样条（始终经过原始控制点）
+    logger.step('步骤 3 / 8：拟合自然边界三次样条');
+    let cX = fitNaturalCubicSpline(tKnots, xCtrl);
+    let cY = fitNaturalCubicSpline(tKnots, yCtrl);
+    logger.info(`X 样条段数: ${cX.a.length} | Y 样条段数: ${cY.a.length}`);
+    logger.data(`自然边界条件满足: M₀ = Mₙ = 0`);
+
+    // Step 3.5: 若有目标长度，二分搜索 α 并混合系数
+    let alphaOpt = 0.0, finalTotalLen = 0;
+    if (targetLen > 0) {
+      logger.step('步骤 3.5 / 8：二分搜索 α 匹配目标弧长（系数混合法）');
+      logger.info(`期望轨迹长度: ${targetLen.toFixed(2)} (弦长总和: ${chordSum.toFixed(2)})`);
+      // 先用原始样条预计算一次弧长做参考
+      const L_nat = computeTotalArcLength(tKnots, cX, cY, 20000);
+      logger.data(`自然样条弧长: ${L_nat.toFixed(2)}`);
+
+      const result = findAlphaForTargetLength(tKnots, cX, cY,
+        xCtrl, yCtrl, targetLen, chordSum, 20000);
+      alphaOpt = result.alpha;
+      finalTotalLen = result.length;
+      if (result.msg) logger.warn(result.msg);
+      if (result.success) {
+        logger.info(`最优 α = ${alphaOpt.toFixed(4)} → 弧长 = ${finalTotalLen.toFixed(2)} (误差 ${Math.abs(finalTotalLen - targetLen).toFixed(2)})`);
+      } else {
+        logger.info(`使用 α = ${alphaOpt.toFixed(4)} → 弧长 = ${finalTotalLen.toFixed(2)}`);
+      }
+
+      // 混合样条系数
+      if (Math.abs(alphaOpt) > 1e-10) {
+        cX = blendSplineCoeffs(tKnots, cX, xCtrl, alphaOpt);
+        cY = blendSplineCoeffs(tKnots, cY, yCtrl, alphaOpt);
+        logger.data(`系数混合完成 (α=${alphaOpt.toFixed(4)})`);
+      }
+    }
+
+    progress.set(42, `等弧长重采样 (20000 → ${N_OUT})...`);
+    await sleep(400);
+
+    // Step 4: 等弧长重采样
+    logger.step(`步骤 4 / 8：等弧长重采样 (${N_OUT} 点)`);
+    let reparam = arcLengthReparam(tKnots, cX, cY, N_OUT, 20000);
+    if (targetLen <= 0) finalTotalLen = reparam.totalLen;
+
+    // Step 4.5: 后处理平滑 + 控制点对齐（控制点位置始终不变）
+    if (smoothStrength > 0) {
+      logger.step('步骤 4.5 / 8：后处理平滑（控制点位置固定）');
+      const smoothed = smoothOutputTrajectory(reparam.x, reparam.y, rawPts, smoothStrength);
+      // 平滑后用数值导数更新 xp, yp, xpp, ypp
+      const nOut = smoothed.x.length;
+      const xp2 = new Float64Array(nOut), yp2 = new Float64Array(nOut);
+      const xpp2 = new Float64Array(nOut), ypp2 = new Float64Array(nOut);
+      for (let i = 1; i < nOut - 1; i++) {
+        xp2[i] = (smoothed.x[i + 1] - smoothed.x[i - 1]) / 2;
+        yp2[i] = (smoothed.y[i + 1] - smoothed.y[i - 1]) / 2;
+      }
+      xp2[0] = smoothed.x[1] - smoothed.x[0];
+      yp2[0] = smoothed.y[1] - smoothed.y[0];
+      xp2[nOut - 1] = smoothed.x[nOut - 1] - smoothed.x[nOut - 2];
+      yp2[nOut - 1] = smoothed.y[nOut - 1] - smoothed.y[nOut - 2];
+      for (let i = 1; i < nOut - 1; i++) {
+        xpp2[i] = (xp2[i + 1] - xp2[i - 1]) / 2;
+        ypp2[i] = (yp2[i + 1] - yp2[i - 1]) / 2;
+      }
+      xpp2[0] = xp2[1] - xp2[0];
+      ypp2[0] = yp2[1] - yp2[0];
+      xpp2[nOut - 1] = xp2[nOut - 1] - xp2[nOut - 2];
+      ypp2[nOut - 1] = yp2[nOut - 1] - yp2[nOut - 2];
+      // 重新计算平滑后的弧长
+      let smoothedLen = 0;
+      for (let i = 1; i < nOut; i++) {
+        const dx = smoothed.x[i] - smoothed.x[i - 1];
+        const dy = smoothed.y[i] - smoothed.y[i - 1];
+        smoothedLen += Math.sqrt(dx * dx + dy * dy);
+      }
+      // 更新 reparam
+      reparam = { x: smoothed.x, y: smoothed.y, xp: xp2, yp: yp2,
+                  xpp: xpp2, ypp: ypp2, totalLen: smoothedLen };
+      finalTotalLen = smoothedLen;
+      logger.data(`平滑完成 (强度=${smoothStrength.toFixed(2)}, 弧长=${smoothedLen.toFixed(2)})`);
+    } else {
+      // 即使不平滑，也将最近输出点对齐到控制点
+      for (const cp of rawPts) {
+        let bestIdx = 0, bestDist2 = Infinity;
+        for (let i = 0; i < reparam.x.length; i++) {
+          const d2 = (reparam.x[i] - cp[0]) ** 2 + (reparam.y[i] - cp[1]) ** 2;
+          if (d2 < bestDist2) { bestDist2 = d2; bestIdx = i; }
+        }
+        reparam.x[bestIdx] = cp[0];
+        reparam.y[bestIdx] = cp[1];
+      }
+    }
+
+    logger.info(`总弧长: ${finalTotalLen.toFixed(2)}`);
+    logger.data(`输出点数: ${N_OUT} | 点间距 ≈ ${(finalTotalLen / (N_OUT - 1)).toFixed(2)}`);
+    progress.set(68, '计算有符号曲率半径...');
+    await sleep(300);
+
+    // Step 5: 曲率半径
+    logger.step('步骤 5 / 8：计算有符号曲率半径 R');
+    const R = computeSignedRadius(reparam.xp, reparam.yp, reparam.xpp, reparam.ypp);
+
+    // 统计
+    let rMin = Infinity, rMax = -Infinity, rMean = 0;
+    let straight = 0;
+    for (let i = 0; i < R.length; i++) {
+      const v = Math.abs(R[i]) < 99999 ? R[i] : NaN;
+      if (!isNaN(v)) {
+        if (v < rMin) rMin = v;
+        if (v > rMax) rMax = v;
+        rMean += v;
+      } else straight++;
+    }
+    rMean /= (R.length - straight);
+    logger.data(`R 范围: [${rMin.toFixed(2)}, ${rMax.toFixed(2)}]`);
+    logger.data(`平均 R: ${rMean.toFixed(2)} | 直线段点: ${straight}`);
+    progress.set(78, '准备输出...');
+    await sleep(200);
+
+    // Step 6: 组装输出数据（系数混合已处理长度，无需额外缩放）
+    logger.step('步骤 6 / 8：组装输出数据');
+    const finalOut = reparam.x.map((x, i) => ({
+      x: x, y: reparam.y[i], R: R[i]
+    }));
+    if (targetLen > 0) {
+      logger.data(`轨迹经过所有 ${rawPts.length} 个控制点，长度=${finalTotalLen.toFixed(2)}`);
+    }
+    progress.set(88, '渲染输出...');
+    await sleep(250);
+
+    // Step 8: 输出
+    logger.step('步骤 7 / 8：生成结果');
+    renderOutput(mapW, mapH, rawPts, finalOut, finalTotalLen);
+    logger.success(`生成完成：${N_OUT} 行轨迹数据`);
+    progress.set(100, '全部完成 ✓', '完成');
+
+  } catch (e) {
+    logger.error(e.message || String(e));
+    progress.set(progress.fill ? parseFloat(progress.fill.style.width) || 0 : 0, '执行出错', '错误');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ──────────────────────────────────────────────────────────
+// 5. 输出渲染
+// ──────────────────────────────────────────────────────────
+function renderOutput(mapW, mapH, ctrlPts, outPts, totalLen) {
+  const outputArea = document.getElementById('outputArea');
+  const empty = document.getElementById('emptyState');
+  if (empty) empty.style.display = 'none';
+
+  // 统计
+  let xs = 0, ys = 0, rs = 0, rAbsMin = Infinity, rAbsMax = 0;
+  let leftCount = 0, rightCount = 0, straight = 0;
+  outPts.forEach(p => {
+    xs += p.x; ys += p.y;
+    const ra = Math.abs(p.R);
+    if (ra < 99999) { rs += p.R; if (ra < rAbsMin) rAbsMin = ra; if (ra > rAbsMax) rAbsMax = ra; }
+    if (p.R > 0 && ra < 99999) leftCount++;
+    else if (p.R < 0 && ra < 99999) rightCount++;
+    else straight++;
+  });
+
+  const statsHTML = `
+    <div class="output-section">
+      <div class="section-title">
+        <div class="bullet"></div>
+        <h3>数据概览</h3>
+        <span class="meta">${outPts.length} PTS</span>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">轨迹总长度</div>
+          <div class="stat-value">${totalLen.toFixed(0)}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">控制点数量</div>
+          <div class="stat-value">${ctrlPts.length}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">最小曲率半径</div>
+          <div class="stat-value">${rAbsMin.toFixed(2)}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">最大曲率半径</div>
+          <div class="stat-value">${rAbsMax.toFixed(2)}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">左转段</div>
+          <div class="stat-value" style="color:#1e4a6e;">${leftCount}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">右转段</div>
+          <div class="stat-value" style="color:#8b2500;">${rightCount}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">近似直线</div>
+          <div class="stat-value" style="color:#a17f1a;">${straight}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">地图范围</div>
+          <div class="stat-value" style="font-size:14px;">${mapW}×${mapH}</div>
+        </div>
+      </div>
+    </div>`;
+
+  // SVG 轨迹图
+  const PAD = 40;
+  const SVG_W = Math.min(960, mapW * 0.18 + PAD * 2);
+  const scaleX = (SVG_W - PAD * 2) / mapW;
+  const SVG_H = mapH * scaleX + PAD * 2;
+  const scaleY = scaleX;
+
+  // 原点(0,0)在右下角，X正方向←，Y正方向↑
+  function tx(x) { return SVG_W - PAD - x * scaleX; }
+  function ty(y) { return SVG_H - PAD - y * scaleY; }
+
+  // 生成 path d
+  let pathD = `M ${tx(outPts[0].x).toFixed(2)} ${ty(outPts[0].y).toFixed(2)}`;
+  for (let i = 1; i < outPts.length; i++) {
+    pathD += ` L ${tx(outPts[i].x).toFixed(2)} ${ty(outPts[i].y).toFixed(2)}`;
+  }
+
+  // 网格
+  let gridSVG = '';
+  const gridCols = 10, gridRows = Math.max(3, Math.round(gridCols * mapH / mapW));
+  for (let i = 0; i <= gridCols; i++) {
+    const x = PAD + (SVG_W - PAD * 2) * i / gridCols;
+    gridSVG += `<line x1="${x}" y1="${PAD}" x2="${x}" y2="${SVG_H - PAD}" stroke="#c9a227" stroke-opacity="0.15" stroke-width="1"/>`;
+  }
+  for (let i = 0; i <= gridRows; i++) {
+    const y = PAD + (SVG_H - PAD * 2) * i / gridRows;
+    gridSVG += `<line x1="${PAD}" y1="${y}" x2="${SVG_W - PAD}" y2="${y}" stroke="#c9a227" stroke-opacity="0.15" stroke-width="1"/>`;
+  }
+
+  // 控制点标注
+  let ctrlSVG = '';
+  ctrlPts.forEach((p, i) => {
+    const cx = tx(p[0]), cy = ty(p[1]);
+    const isFirst = i === 0;
+    const isLast = i === ctrlPts.length - 1;
+    const fill = isFirst ? '#4a7c3a' : isLast ? '#8b2500' : '#c9a227';
+    ctrlSVG += `<g>
+      <circle cx="${cx}" cy="${cy}" r="9" fill="${fill}" fill-opacity="0.15"/>
+      <circle cx="${cx}" cy="${cy}" r="5" fill="${fill}" stroke="#faf3e0" stroke-width="1.5"/>
+      <text x="${cx}" y="${cy - 12}" text-anchor="middle" font-family="Cinzel, serif" font-size="9" fill="${fill}" font-weight="700">${i + 1}</text>
+    </g>`;
+  });
+
+  // 起终点特殊标记
+  const start = outPts[0], end = outPts[outPts.length - 1];
+  const endMarkSVG = `
+    <g>
+      <circle cx="${tx(start.x)}" cy="${ty(start.y)}" r="14" fill="none" stroke="#4a7c3a" stroke-width="2" stroke-dasharray="3 2"/>
+      <text x="${tx(start.x)}" y="${ty(start.y) + 26}" text-anchor="middle" font-family="Noto Serif SC, serif" font-size="11" fill="#4a7c3a" font-weight="700">起点 长安</text>
+    </g>
+    <g>
+      <circle cx="${tx(end.x)}" cy="${ty(end.y)}" r="14" fill="none" stroke="#8b2500" stroke-width="2" stroke-dasharray="3 2"/>
+      <text x="${tx(end.x)}" y="${ty(end.y) + 26}" text-anchor="middle" font-family="Noto Serif SC, serif" font-size="11" fill="#8b2500" font-weight="700">终点 罗马</text>
+    </g>
+  `;
+
+  // 坐标轴标注
+  let axisSVG = '';
+  for (let i = 0; i <= gridCols; i++) {
+    const xv = Math.round(mapW * (gridCols - i) / gridCols);
+    const x = PAD + (SVG_W - PAD * 2) * i / gridCols;
+    axisSVG += `<text x="${x}" y="${SVG_H - PAD + 16}" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="#a17f1a" opacity="0.8">${xv}</text>`;
+  }
+  for (let i = 0; i <= gridRows; i++) {
+    const yv = Math.round(mapH * (gridRows - i) / gridRows);
+    const y = PAD + (SVG_H - PAD * 2) * i / gridRows;
+    axisSVG += `<text x="${PAD - 8}" y="${y + 4}" text-anchor="end" font-family="JetBrains Mono, monospace" font-size="10" fill="#a17f1a" opacity="0.8">${yv}</text>`;
+  }
+
+  const mapHTML = `
+    <div class="output-section">
+      <div class="section-title">
+        <div class="bullet"></div>
+        <h3>轨迹地图可视化</h3>
+        <span class="meta">${mapW} × ${mapH} CANVAS</span>
+      </div>
+      <div class="map-container">
+        <div class="map-svg-wrap">
+          <svg class="trajectory-map" viewBox="0 0 ${SVG_W} ${SVG_H}" width="${SVG_W}" height="${SVG_H}" xmlns="http://www.w3.org/2000/svg">
+            <!-- 外框 -->
+            <rect x="2" y="2" width="${SVG_W - 4}" height="${SVG_H - 4}" fill="none" stroke="#a17f1a" stroke-width="1" rx="2"/>
+            <!-- 网格 -->
+            ${gridSVG}
+            <!-- 边框内框 -->
+            <rect x="${PAD}" y="${PAD}" width="${SVG_W - PAD * 2}" height="${SVG_H - PAD * 2}" fill="none" stroke="#8b6914" stroke-width="1.5" stroke-opacity="0.5"/>
+            <!-- 轴标注 -->
+            ${axisSVG}
+            <!-- 轨迹 path -->
+            <path d="${pathD}" fill="none" stroke="url(#trailGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <defs>
+              <linearGradient id="trailGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#4a7c3a"/>
+                <stop offset="30%" stop-color="#c9a227"/>
+                <stop offset="70%" stop-color="#e08a3c"/>
+                <stop offset="100%" stop-color="#8b2500"/>
+              </linearGradient>
+            </defs>
+            <!-- 控制点 -->
+            ${ctrlSVG}
+            <!-- 起终点标记 -->
+            ${endMarkSVG}
+          </svg>
+        </div>
+        <div class="map-legend">
+          <div class="legend-item"><div class="legend-swatch" style="background:linear-gradient(90deg,#4a7c3a,#c9a227,#e08a3c,#8b2500);"></div>轨迹曲线 (${outPts.length}点等弧长采样)</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#c9a227;"></div>控制点</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#4a7c3a;"></div>起点</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#8b2500;"></div>终点</div>
+          <div class="legend-item"><div class="legend-dot" style="background:transparent;border:1.5px dashed #a17f1a;"></div>地图范围</div>
+        </div>
+      </div>
+    </div>`;
+
+  // 数据表格 (前10+后10行，中间省略)
+  const rows = [];
+  const pushRow = (i) => {
+    const p = outPts[i];
+    rows.push(`<tr>
+      <td>${i + 1}</td>
+      <td>${p.x.toFixed(2)}</td>
+      <td>${p.y.toFixed(2)}</td>
+      <td>${p.R >= 0 ? '+' : ''}${p.R.toFixed(2)}</td>
+    </tr>`);
+  };
+  for (let i = 0; i < Math.min(10, outPts.length); i++) pushRow(i);
+  if (outPts.length > 20) {
+    rows.push(`<tr><td colspan="4" style="text-align:center; color:#a17f1a; font-weight:600; padding:10px;">⋯ 省略 ${outPts.length - 20} 行 ⋯</td></tr>`);
+  }
+  for (let i = Math.max(10, outPts.length - 10); i < outPts.length; i++) pushRow(i);
+
+  const tableHTML = `
+    <div class="output-section">
+      <div class="section-title">
+        <div class="bullet"></div>
+        <h3>输出数据 (X, Y, R)</h3>
+        <span class="meta">TAB-SEPARATED · ${outPts.length} ROWS · 2 DECIMALS</span>
+      </div>
+      <div style="margin-bottom:12px; display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn btn-secondary" style="flex:none; padding:8px 16px; font-size:12px;" onclick="downloadData()">⬇ 下载完整 TXT</button>
+        <button class="btn btn-secondary" style="flex:none; padding:8px 16px; font-size:12px;" onclick="copyData()">⎘ 复制到剪贴板</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width:60px;">序号</th>
+              <th>X</th>
+              <th>Y</th>
+              <th>曲率半径 R</th>
+            </tr>
+          </thead>
+          <tbody>${rows.join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+
+  outputArea.innerHTML = statsHTML + mapHTML + tableHTML;
+
+  // 保存输出数据到全局供下载/复制
+  window._lastOutput = { points: outPts };
+}
+
+function downloadData() {
+  const d = window._lastOutput;
+  if (!d) return;
+  const txt = d.points.map(p =>
+    `${p.x.toFixed(2)}\t${p.y.toFixed(2)}\t${p.R.toFixed(2)}`
+  ).join('\n');
+  const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'trajectory_output.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function copyData() {
+  const d = window._lastOutput;
+  if (!d) return;
+  const txt = d.points.map(p =>
+    `${p.x.toFixed(2)}\t${p.y.toFixed(2)}\t${p.R.toFixed(2)}`
+  ).join('\n');
+  try {
+    await navigator.clipboard.writeText(txt);
+    logger.success(`已复制 ${outPts.length} 行数据到剪贴板`);
+  } catch {
+    logger.warn('复制失败，请手动选择下载');
+  }
+}
+
+// ──────────────────────────────────────────────────────────
+// 6. 初始化
+// ──────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  logger.init();
+  progress.init();
+  pointsEditor.init();
+
+  document.getElementById('generateBtn').addEventListener('click', generateTrajectory);
+  document.getElementById('loadDemoBtn').addEventListener('click', () => {
+    document.getElementById('mapWidth').value = SILK_ROAD_DEMO.mapW;
+    document.getElementById('mapHeight').value = SILK_ROAD_DEMO.mapH;
+    pointsEditor.loadPoints(SILK_ROAD_DEMO.points);
+    logger.clear();
+    progress.set(0, '', '待命');
+    logger.info('已载入丝绸之路示例：31 控制点 (长安 → 罗马)');
+  });
+});
+</script>
+</body>
+</html>
